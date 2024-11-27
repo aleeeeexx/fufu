@@ -4,8 +4,10 @@ class Drag {
   params = {}
   mouseOffsetBottom = 0
   mouseOffsetRight = 0
-  init = (params) => {
+  dragStartCallBack = null
+  init = (params, dragStartCallBack) => {
     this.params = params
+    this.dragStartCallBack = dragStartCallBack
   }
 
   //初始化设置拖动元素
@@ -42,6 +44,7 @@ class Drag {
 
   //拖动元素注册事件
   setDrag = (el) => {
+    console.log(el, 'setDrag')
     el.setAttribute && el.setAttribute('draggable', 'true')
     el.ondragstart = this.dragStartEvent
     el.ondrag = this.ondragEvent
@@ -135,7 +138,10 @@ class Drag {
 
   /****** 事件处理 ******/
   dragStartEvent = (ev) => {
-    console.log('开始拖拽', ev)
+    console.log('开始拖拽-dragStartEvent', ev.target)
+    const currentDragComponentName = ev.target.getAttribute('comp-name')
+    this.dragStartCallBack(currentDragComponentName, 10)
+    // const a = ev.target.dataset.componentName
     //获得鼠标距离拖拽元素的下边的距离
     this.mouseOffsetBottom = ev.currentTarget.clientHeight - ev.offsetY
     //获得鼠标距离拖拽元素的右边的距离
@@ -158,7 +164,9 @@ class Drag {
     //   console.log('释放区外面')
     // }
   }
-
+  dragOverEvent = (ev) => {
+    ev.preventDefault()
+  }
   dragEndEvent = (ev) => {
     this.removePlaceholderEle()
     console.log('拖拽结束')
@@ -185,8 +193,11 @@ class Drag {
   }
 
   dropEvent = (ev) => {
-    ev.preventDefault()
+    console.log(this, 'dropEvent-this')
     console.log('在放置区放开鼠标')
+    ev.preventDefault()
+
+    // this.dropCallBack(this.currentDragComponentName, 10)
   }
 }
 
@@ -228,11 +239,11 @@ export const useIframeLoad = (iframeEle, cb) => {
   const iframeLoad = () => {
     // const iframeEle = document.getElementById(iframeIdName)
     if (iframeEle) {
-      iframeState.value = iframeEle.contentDocument.readyState === 'complete'
-      console.log(
-        iframeEle.contentDocument.readyState,
-        'iframeEle.contentDocument.readyState'
-      )
+      // iframeState.value = iframeEle.contentDocument.readyState === 'complete'
+      // console.log(
+      //   iframeEle.contentDocument.readyState,
+      //   'iframeEle.contentDocument.readyState'
+      // )
       if (!iframeState.value) {
         iframeEle.onload = () => {
           console.log('iframe 加载完毕')
@@ -250,6 +261,7 @@ export const useIframeLoad = (iframeEle, cb) => {
       iframeLoad()
     })
   } else {
+    console.log('elelelel', iframeState.value)
     iframeLoad()
   }
 

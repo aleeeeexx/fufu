@@ -24,7 +24,6 @@
 <script>
 // 导入要注册的组件
 import TitleText from '../components/titletext/index.vue'
-import Drag from '../drag'
 
 export default {
   // 在这里局部注册
@@ -36,21 +35,27 @@ export default {
 <script setup>
 import { onMounted, ref } from 'vue'
 import _remove from 'lodash/remove'
-import state from './store'
+import state from '../store'
+import { useDrop } from '../newDrop'
+const { initDrop } = useDrop()
 // 父节点的document
 let parent = null
 const currentComponentId = ref('')
+
 function initMessage() {
   window.addEventListener('message', (event) => {
-    // console.log('Message received:', event.data);
     const { message, data } = event.data
+    console.log('message-from-edit:', message, data)
+
     if (message === 'init') {
       parent = event.source
     }
-    if (message === 'addComponent' && data && data.id) {
+
+    if (message === 'dropComp' && data && data.id) {
       parent = event.source
       state.components.push(data)
     }
+
     if (
       message === 'updateComponent' &&
       data &&
@@ -70,6 +75,7 @@ function initMessage() {
 
 function selectComponent(cid) {
   currentComponentId.value = cid
+  console.log(parent, 'parent')
   parent.postMessage({ message: 'selectComponent', data: { id: cid } })
 }
 
@@ -81,11 +87,16 @@ function deleteComponent(item) {
   parent.postMessage({ message: 'deleteComponent', data: { id: item.id } })
 }
 
+const _dropCallBack = () => {
+  parent.postMessage({ message: 'compDroped' })
+}
+
 onMounted(() => {
-  console.log(document.readyState, 'document.readyState')
+  // 注册监听事件
   initMessage()
-  console.log(document.getElementById('preview_content'), 'component_box')
-  Drag.initDrop(document.getElementById('preview_content'))
+
+  // 绑定drop事件
+  initDrop('preview_content', _dropCallBack)
 })
 </script>
 

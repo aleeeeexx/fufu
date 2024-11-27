@@ -1,14 +1,21 @@
 <template>
   <div class="edit_container fl fl_jc_fs fl_ai_fs">
-    <div class="edit_left" id="drag-box">
+    <div class="edit_left" id="drag-wrapper">
       <template v-for="item in ToolsList" :key="item.componentName">
         <div
           class="edit_tools_item flv fl_jc_c fl_ai_c"
-          @click="addComp(item.componentName, item.limit)"
+          :data-componentName="item.componentName"
+          :comp-name="item.componentName"
         >
-          <img :src="item.iconUrl" class="edit_tools_item_icon" />
-          <span class="edit_tools_item_title">{{ item.name }}</span>
-          <span class="edit_tools_item_count"
+          <img
+            :src="item.iconUrl"
+            class="edit_tools_item_icon"
+            :comp-name="item.componentName"
+          />
+          <span class="edit_tools_item_title" :comp-name="item.componentName">{{
+            item.name
+          }}</span>
+          <span class="edit_tools_item_count" :comp-name="item.componentName"
             >{{ ToolItemCount[item.componentName] }} / {{ item.limit }}</span
           >
         </div>
@@ -43,75 +50,17 @@ export default {
 <script setup>
 import { onMounted, ref } from 'vue'
 import _remove from 'lodash/remove'
-import state, { ToolsList, ToolItemCount } from './store'
-import db from '../db'
-import Drag from '../drag'
+import state, { ToolsList, ToolItemCount } from '../store'
+import { useComponentsStore } from '../storeData'
+import { useDrag } from '../newDrag'
+import { useIframeLoad } from '../hooks'
+
+const store = useComponentsStore()
+const { setDragEvent } = useDrag()
+
 // 当前选中的组件
 const selectedComponent = ref({})
 let childIFrame = null
-const ComponentMap = {
-  TitleText: {
-    name: '标题文本',
-    componentName: 'TitleText',
-    configComponentName: 'TitleTextConfig',
-    value: '这里是标题文本',
-    styles: {
-      textAlign: 'left',
-      fontWeight: 'normal',
-      color: '#333',
-      backgroundColor: '#fff'
-    },
-    is_splite_line: false,
-    is_more: false,
-    more_setting: {
-      mode: 'mod1',
-      url: '',
-      text: '查看更多'
-    }
-  },
-  Image: {
-    name: '图片',
-    componentName: 'Image',
-    value: '',
-    styles: {
-      margin: '',
-      borderRadius: '',
-      boxShadow: ''
-    }
-  },
-  Carousel: {
-    name: '轮播',
-    componentName: 'Carousel',
-    value: [
-      {
-        name: '图片',
-        componentName: 'Image',
-        value: '',
-        styles: {
-          margin: '',
-          borderRadius: '',
-          boxShadow: ''
-        }
-      }
-    ]
-  }
-}
-const addComp = (key, limit) => {
-  if (ComponentMap[key] && ToolItemCount[key] < limit) {
-    const cid = s4() + s4()
-    const cData = { ...ComponentMap[key] }
-    cData.id = cid
-    // console.log(cData);
-    state.components.push(cData)
-    ToolItemCount[key]++
-    // window.postMessage(cData);
-    childIFrame.postMessage({ message: 'addComponent', data: cData })
-    db.states.add({ ...cData, create_time: Date.now() })
-  }
-}
-const s4 = () => {
-  return (((1 + Math.random()) * 0x10000) | 0).toString(16).substring(1)
-}
 
 function deleteComponent(cid) {
   state.components = _remove(state.components, (item) => {
@@ -120,7 +69,6 @@ function deleteComponent(cid) {
 }
 
 function onChange(key, value) {
-  // console.log(key,'===',value);
   selectedComponent.value[key] = value
   childIFrame.postMessage({
     message: 'updateComponent',
@@ -128,31 +76,47 @@ function onChange(key, value) {
   })
 }
 
-onMounted(() => {
-  childIFrame = document.getElementById('edit_preview_iframe').contentWindow
+const _postInitMsg = () => {
   if (childIFrame) {
     childIFrame.postMessage({ message: 'init', data: null })
-
-    Drag.init({
-      dragEle: document.getElementById('drag-box'),
-      dropEle: document.getElementById('edit_preview_iframe')
-    })
-    Drag.initDrag(document.getElementById('drag-box'))
   }
+}
+
+const _initListener = () => {
   window.addEventListener('message', (event) => {
-    // console.log('Message received:', event.data);
     const { message, data } = event.data
+    console.log('msg&data-from-iframe:', message, data)
+
     if (message === 'deleteComponent' && data && data.id) {
       deleteComponent(data.id)
     }
+
+    if (message === 'compDroped') {
+      store.dropComp(childIFrame)
+    }
+
     if (message === 'selectComponent' && data && data.id) {
-      state.components.forEach((item) => {
+      store.currentEditComponents.forEach((item) => {
         if (item.id === data.id) {
           selectedComponent.value = item
         }
       })
     }
   })
+}
+
+onMounted(() => {
+  // 获取iframe实例
+  childIFrame = document.getElementById('edit_preview_iframe').contentWindow
+
+  //对每一个待拖拽的组件绑定拖拽事件
+  setDragEvent('drag-wrapper', document.getElementById('edit_preview_iframe'))
+
+  // 注册监听iframe事件
+  _initListener()
+
+  // 当iframe加载完毕，发送初始化信息给iframe，在iframe中保留edit组件实例
+  useIframeLoad(document.getElementById('edit_preview_iframe'), _postInitMsg)
 })
 </script>
 
